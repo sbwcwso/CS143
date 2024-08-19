@@ -1,0 +1,436 @@
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage{textcomp,lmodern,fixcmex}
+\usepackage[margin=1in]{geometry}
+\usepackage{mathtools}
+\usepackage{makebox}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{ebproof}
+\usepackage{calc}
+\usepackage[pdfusetitle]{hyperref}
+
+\renewcommand{\epsilon}{\varepsilon}
+\newcommand{\gor}{\mathrel{\makebox*{$\to$}{$|$}}}
+\newcommand{\kw}[1]{\ensuremath{\mathbf{#1}}}
+\newcommand{\param}[1]{\ensuremath{\mathit{#1}}}
+
+\DeclarePairedDelimiter\angl{\langle}{\rangle}
+\DeclarePairedDelimiter\Brack{\text{\textlbrackdbl}}{\text{\textrbrackdbl}}
+
+\lstdefinelanguage{cool}{
+    morekeywords={class,else,fi,if,in,inherits,let,loop,pool,then,while,case,esac,of,new,isvoid,true,false,self,not},
+    morecomment=[l]{--},
+    morecomment=[n]{(*}{*)},
+    morestring=[b]",
+    alsoother={@},
+}
+
+\lstdefinelanguage{asm}{
+    morekeywords={push,read,top,pop,swap,jump,print},
+    morecomment=[l]{//},
+}
+
+\lstset{
+    language=cool,
+    breaklines=true,
+    keywordstyle=\bfseries,
+    stringstyle=\ttfamily,
+    upquote=true,
+    emphstyle=\itshape,
+    columns=flexible,
+    literate={<-}{{$\gets$}}2 {<=}{{$\le$}}1,
+    showstringspaces=false,
+    numbers=left,
+    numberstyle=\tiny,
+    escapeinside={(*@}{@*)},
+}
+
+\title{CS143 Spring 2024 -- Written Assignment 3}
+\newcommand\duedate{Tuesday, May 21, 2024 at 11:59 \textsc{pm pdt}}
+
+\begin{document}
+\begin{center}
+% Change this:
+\LARGE YOUR NAME -- \texttt{SUNet ID} \\
+\LARGE CS143 Spring 2024 -- Written Assignment 3
+\end{center}
+
+This assignment covers semantic analysis, including scoping, type systems,
+and code generation. You may discuss this assignment with other students and
+work on the problems together. However, your write-up should be your own
+individual work, and you should indicate in your submission who you worked
+with, if applicable. Assignments can be submitted electronically through
+Gradescope as a \textsc{pdf} by \duedate. Please review the course policies
+for more information: \url{https://web.stanford.edu/class/cs143/policies/}.
+A \LaTeX{} template for writing your solutions is available on the course
+website.
+
+\begin{enumerate}
+% Problem 1
+\item The Un-Cool Society tore up a precious scroll containing the first-ever Cool program!
+Thankfully, most of the the code was able to be pieced together:
+\begin{enumerate}
+    \item ~
+    \begin{lstlisting}[gobble=4, emph={x,io,a,b,c}, basicstyle=\small]
+    class A {
+        x: A;   (*@\label{p1a:ln2}@*)
+        one(): A { x <- (* ??? BLANK 1 ??? *) };
+        two(): A { x };
+        three(): String { (* ??? BLANK 2 ??? *) };
+    };
+    class B inherits A {
+        three(): String { (* ??? BLANK 3 ??? *) };
+    };
+    class C inherits A {
+        two(): A { new A };
+        three(): String { (* ??? BLANK 4 ??? *) };
+    };
+    class Main {
+        main(): Object {
+            let io: IO <- new IO,
+                b : B  <- new B,
+                c : C  <- new C
+            in {
+                io.out_string(c.two().three());
+                io.out_string(" ");
+                io.out_string(c.one().three());
+                io.out_string(" ");
+                io.out_string(b.one().three());
+                io.out_string(" ");
+                io.out_string(c.one().two().one().three());
+            }
+        };
+    };
+    \end{lstlisting}
+
+    \newpage
+
+    Replace \textit{only} blanks 1-4 on lines 3, 5, 8, and 12 respectively with
+    \textbf{a single expression each (no blocks)} so that the code
+    prints out \texttt{``Cool compilers are Cool''}.
+
+    \bigskip
+
+    \textbf{Answer:}
+
+    \newpage
+
+    \item To celebrate the recovery of the first-ever Cool program, the Cool development team
+    plans to throw a celebration featuring their food, bananas. Here is an incomplete program
+    written by one of the developers:
+    \begin{lstlisting}[gobble=4, emph={io,x}, basicstyle=\small]
+    class Main {
+        main(): Object {
+            let io: IO <- new IO, counter: Int <- 5 in {
+                -- print 5 lines of bananas
+                while 0 < counter loop {
+                    io.out_string("ba");
+                    let counter: Int <- 2 in {
+                        -- print "nana" in a Cool way!
+                        while 0 < counter loop {
+                            io.out_string("na");
+                            counter <- counter - 1;
+                        } pool;
+
+                        -- only print the "s" if we have more than one banana
+                        if (* INCOMPLETE *) then {
+                            io.out_string("s\n"); 1;
+                        } else 0;
+                    };
+
+                    -- decrement the print counter
+                    counter <- counter - 1;
+                } pool;
+            };
+        };
+    };
+    \end{lstlisting}
+
+    The developer needs your help with filling in the incomplete expression on line 15 so that the
+    program prints the following output:
+    \begin{verbatim}
+5 bananas
+4 bananas
+3 bananas
+2 bananas
+1 banana
+    \end{verbatim}
+    Replace \lstinline!(* INCOMPLETE *)! with a single expression such that the program prints the desired output, or
+    explain why it is not possible.
+
+    \bigskip
+
+    \textbf{Answer:}
+
+\end{enumerate}
+
+\newpage
+
+% Problem 2
+\item Type derivations are expressed as inductive proofs in the form of trees of logical expressions. For example, the following is the type derivation for $O[\mathrm{Int}/y], M, C \vdash y + y: \mathrm{Int}$:
+\begin{center}
+\begin{prooftree}
+    \hypo[]{O[\mathrm{Int}/y](y) = \mathrm{Int}}
+    \infer1[[Var]]{O[\mathrm{Int}/y],M,C \vdash y: \mathrm{Int}}
+    \hypo[]{O[\mathrm{Int}/y](y) = \mathrm{Int}}
+    \infer1[[Var]]{O[\mathrm{Int}/y],M,C \vdash y:\mathrm{Int}}
+    \infer2[[Arith]]{O[\mathrm{Int}/y],M,C \vdash y+y:\mathrm{Int}}
+\end{prooftree}
+\end{center}
+The [Var] and [Arith] labels refer to the corresponding inference rules in the Cool Reference Manual, section 12.2.\footnote{See \url{https://web.stanford.edu/class/cs143/materials/cool-manual.pdf}, pp.\ 18--22.}
+
+\smallskip
+
+Consider the following Cool program fragment:
+\begin{lstlisting}[emph={i,b,s,o,a,x,y}, basicstyle=\small]
+class A {
+    i: Int;
+    b: Bool;
+    s: String;
+    o: SELF_TYPE;
+    foo(): SELF_TYPE { o };
+    bar(): Int { 2 * i + 1 };
+};
+
+class B inherits A {
+    a: A;
+    baz(x: Int, y: Int): Bool { x = y };
+    test(): Object { (* PLACEHOLDER *) };
+};
+\end{lstlisting}
+Note that the environments $O$ and $M$ at the start of the method test() are as follows:
+\begin{gather*}
+    O = \emptyset[\mathrm{Int}/i][\mathrm{Bool}/b][\mathrm{String}/s][\mathrm{SELF\_TYPE}_{\mathrm{B}}/o][\mathrm{A}/a][\mathrm{SELF\_TYPE}_{\mathrm{B}}/\mathit{self}], \\[2ex]
+    \begin{aligned}
+    M = \emptyset&[(\mathrm{SELF\_TYPE})/(\mathrm{A},\mathrm{foo})][(\mathrm{Int})/(\mathrm{A},\mathrm{bar})] \\
+                 &[(\mathrm{SELF\_TYPE})/(\mathrm{B},\mathrm{foo})][(\mathrm{Int})/(\mathrm{B},\mathrm{bar})] \\
+                 &[(\mathrm{Int,Int,Bool})/(\mathrm{B},\mathrm{baz})][(\mathrm{Object})/(\mathrm{B},\mathrm{test})].
+    \end{aligned}
+\end{gather*}
+
+For each of the following expressions replacing \lstinline{(* PLACEHOLDER *)}, provide the inferred type of the expression, as well as its derivation as a proof tree.\footnote{To draw proof trees in \LaTeX, consider using the \href{https://ctan.org/pkg/ebproof?lang=en}{\textsf{ebproof}} package. You can also use the tree in the template as an example.} For brevity, you may omit subtyping relations where the same type is on both sides (e.g., $\mathrm{Bool} \le \mathrm{Bool}$). You also do not need to label each step with the inference rule name like we did above.
+
+\newpage
+
+\newcommand{\Str}{\mathrm{String}}
+\newcommand{\Bool}{\mathrm{Bool}}
+\newcommand{\Int}{\mathrm{Int}}
+\newcommand{\A}{\mathrm{A}}
+\newcommand{\B}{\mathrm{B}}
+\newcommand{\ST}{\mathrm{SELF\_TYPE}}
+
+\begin{enumerate}
+    \item \lstinline[keepspaces=true, emph={s,b,i}]|b <- self.baz(i, 1);|
+
+        \textbf{Answer}:
+        \vspace{6cm}
+
+    \item \lstinline[keepspaces=true, emph={c}]{let c: A <- self.foo() in c.foo()}
+
+        \textbf{Answer}:
+        \vspace{6cm}
+
+    \item \lstinline[keepspaces=true, emph={a,i}]{if 1 <= i then self.foo() else a.foo() fi}
+
+        \textbf{Answer}:
+\end{enumerate}
+
+\newpage
+
+% Problem 3
+\item Consider the following Cool program:
+\begin{lstlisting}[emph={b}, basicstyle=\small]
+class Main {
+    b: B;
+    main(): Object {{
+        b <- new B;
+        b.foo();
+    }};
+};
+\end{lstlisting}
+Now consider the following implementations of the classes A and B. Analyze each version of the classes to determine:
+\begin{itemize}
+    \item if the resulting program will pass type checking
+    \item if it does, whether it will execute without runtime errors
+\end{itemize}
+Please include a brief (1--2 sentences) explanation along with your answer.  Note it is not sufficient to simply copy the output of the reference Cool compiler: if it fails type checking, you must specify which hypotheses cannot be satisfied for which rules.
+
+\begin{enumerate}
+    \item ~\\
+    \begin{minipage}{2.4in}
+    \begin{lstlisting}[gobble=4, emph={i,j,a}, basicstyle=\small]
+    class A {
+        i: Int <- 1;
+        a: SELF_TYPE <- new A;
+        foo(): Int {i};
+    };
+
+    class B inherits A {
+        j: Int <- 1;
+        baz(): Int {i <- 2 + i};
+        foo(): Int {
+            j <- a.baz() + a.foo()
+        };
+    };
+    \end{lstlisting}
+    \end{minipage}%
+    \begin{minipage}{\linewidth-2.4in}
+    \textbf{Answer:}
+    \end{minipage}
+
+    \item ~\\
+    \begin{minipage}{2.4in}
+    \begin{lstlisting}[gobble=4, emph={i,j,a}, basicstyle=\small]
+    class A {
+        i: Int <- 1;
+        a: SELF_TYPE;
+        foo(): Int {i};
+    };
+
+    class B inherits A {
+        j: Int <- 1;
+        baz(): Int {i <- i + j};
+        foo(): Int {{
+            a <- new SELF_TYPE;
+            j <- a.baz() + a@A.foo();
+        }};
+    };
+    \end{lstlisting}
+    \end{minipage}%
+    \begin{minipage}{\linewidth-2.4in}
+    \textbf{Answer:}
+    \end{minipage}
+\end{enumerate}
+
+\newpage
+
+% Problem 4
+\item Consider the following extensions to Cool:
+\begin{enumerate}
+
+    \item Maps.
+    \begin{align*}
+        \mathit{expr} &\Coloneqq \ldots \\
+                      &\gor \kw{new}\ \angl{\ \mathrm{TYPE}, \mathrm{TYPE} \ } \\
+                      &\gor \mathit{expr}\ [\ \mathit{expr} \ ] \\
+                      &\gor \mathit{expr}\ [\ \mathit{expr} \ ] \ \texttt{<-}\ \mathit{expr}
+    \end{align*}
+    \emph{Note: In the above expression definitions, single brackets correspond to the actual
+    \texttt{[} and \texttt{]} characters, and not that the tokens between the brackets are
+    optional like in Figure 1 of the Cool manual.}
+
+    A map is a key-value store, like \texttt{std::map} or \texttt{std::unordered\_map} in
+    C++ or dictionaries in Python. A key can be inserted into the map with a single associated value. A \emph{map type} is defined as $\angl{T_1, T_2}$, where $T_1$ can be an Int or String and $T_2$ can be any type in Cool (including SELF\_TYPE and other map types). $T_1$ is the type of the key, and $T_2$ is the type of the value. Note that the entire hierarchy of map types still has Object as its topmost supertype. Additionally, the subtype relation between map types is defined as follows:
+    \[
+        \angl{T_1, T_2} \le \angl{T'_1, T'_2} \quad \text{if and only if } T_1 = T'_1 \text{ and } T_2 \le T'_2.
+    \]
+    A map object can be initialized with an expression similar to
+    \[
+        my\_map\colon \angl{\mathrm{Int},\mathrm{Object}} \gets \kw{new}\ \angl{\mathrm{Int},\mathrm{String}};
+    \]
+    Thereafter, a key-value pair $\angl{k, v}$ can be inserted into the map with the syntax \texttt{my\_map[k] <- v}. The value corresponding to a given key can be accessed with the syntax \texttt{my\_map[k]}. Both of these expressions return the value, in this case \texttt{v}.
+    \smallskip
+
+    Provide new typing rules for Cool which handle the typing judgments for the three new forms of expressions: Map-New,
+    Map-Access, and Map-Insert. As an example, your type rules should ensure the following given the earlier declaration:
+    \[
+        O, M, C \vdash \mathit{my\_map}[0]\ \texttt{<-}\ \text{``Hello''} : \mathrm{Object} \qquad\qquad
+        O, M, C \vdash \mathit{my\_map}[1] : \mathrm{Object}
+    \]
+
+    \emph{Hint: See [New] in the Cool manual for an example that deals with SELF\_TYPE in a way similar to how you will have to
+    in the Map-New rule.}
+
+    \emph{Note: You do not need to consider the case when the map is accessed with a key that was never inserted into the map,
+    as that would be handled at runtime and not by the type checker.}
+
+    \bigskip
+
+    \begin{minipage}{\textwidth}
+    \textbf{Answer:}
+    \vspace{7cm}
+    \end{minipage}
+    \newpage
+    \item Multiple inheritance.
+
+    Cool's type system allows single inheritance, where one class inherits from
+    at most one other class. However, many programming
+    languages\footnote{Examples include C++, Go, and Python.} allow a class to
+    inherit from multiple superclasses. This is especially useful for
+    ``interface''-like classes: a hypothetical \texttt{File} class can inherit
+    from both \texttt{Reader} and \texttt{Writer}, while standard input only
+    inherits from \texttt{Reader}:
+    \begin{lstlisting}[gobble=4, emph={s}, basicstyle=\small]
+    class Reader {
+        read(): String {""};                   -- to be overridden by subclass
+    };
+    class Writer {
+        write(s: String): SELF_TYPE {self};    -- to be overridden by subclass
+    };
+    class File inherits Reader, Writer {
+        read(): String { ... }
+        write(s: String): SELF_TYPE {{ ...; self; }}
+    };
+    class Stdin inherits Reader {
+        read(): String { ... }
+    };
+    \end{lstlisting}
+
+    Now, most Cool code would continue to work if Cool is extended to support
+    multiple inheritance. However, some Cool expressions would have
+    undefined behavior without adjustments to its semantics. Identify one
+    form of expression that would be undefined and explain why it would be
+    undefined.
+
+    \bigskip
+
+    \textbf{Answer:}
+
+\end{enumerate}
+
+\newpage
+
+% Problem 5
+\item Consider the following assembly language used to program a stack ($r$, $r_1$, and $r_2$ denote arbitrary registers):
+    \begin{itemize}
+        \item $\kw{push}\ \param{offset}\  r$: copies the value of $r$ and pushes it onto the stack with a provided offset. An offset of 0 pushes a value to the top of the stack, an offset of 1 pushes a value to the second-highest position in the stack, etc.
+        \item $\kw{read}\ \param{offset}\ r$: copies the value at the provided offset from the top of the stack into $r$. This command does not modify the stack. An offset of 0 reads the value at the top of the stack, an offset of 1 reads the value at the second-from-top of the stack, etc.
+        \item $\kw{pop}\ \param{offset}$: discards the value at the provided offset from the top of the stack. An offset of 0 pops the value at the top of the stack, an offset of 1 pops the value at the second-highest position in the stack, etc.
+        \item $r_1 \mathbin{{*}{=}} r_2$: multiplies $r_1$ and $r_2$ and saves the result in $r_1$. $r_1$ may be the same as $r_2$.
+        \item $r_1 \mathbin{{/}{=}} r_2$: divides $r_1$ with $r_2$ and saves the result in $r_1$. $r_1$ may be the same as $r_2$. Remainders are discarded (e.g., $5 / 2 = 2$).
+        \item $r_1 \mathbin{{+}{=}} r_2$: adds $r_1$ and $r_2$ and saves the result in $r_1$. $r_1$ may be the same as $r_2$.
+        \item $r_1 \mathbin{{-}{=}} r_2$: subtracts $r_2$ from $r_1$ and saves the result in $r_1$. $r_1$ may be the same as $r_2$.
+        \item $\kw{jump}\ r$: jumps to the line number in $r$ and resumes execution.
+        \item $\kw{print}\ r$: prints the value in $r$ to the console.
+    \end{itemize}
+The machine has two registers available to the program: \textbf{reg1}, and \textbf{reg2}. The stack is permitted to grow to a finite, but very large, size. If an invalid line number is invoked, a number is divided by zero, \kw{push}, \kw{read}, or \kw{pop} is executed with an invalid offset, or the maximum stack size is exceeded, the machine crashes.
+
+\bigskip
+
+Write code to enumerate and print the factorials ($F_n = n \times F_{n-1}$ where $F_1 = 1$; e.g., $1, 2, 6, 24, \ldots$) starting at $F_1$. Assume that the code will be placed at line 100, and will be invoked by pushing 1, 1 onto the stack $\angl{\$, \ldots, 1, 1}$, storing 100 in \lstinline[language=asm]{reg1}, and running \lstinline[language=asm]{jump reg1}.
+
+Your code should use the \kw{print} opcode to display numbers in the sequence. You may not hardcode constants nor use any other instructions besides the ones given above. There is no need to keep the number in memory after it has been printed out.  Your code should not terminate (or crash) after any amount of time.  Assume that registers and the stack can hold arbitrarily large integers so computation will never overflow.
+
+Hint: it may help to comment each line with a symbolic machine state and think about what the state the code should be in at the end.
+(You are not required to do this but it will help us give you partial credit if you do.)
+E.g.:
+
+\begin{lstlisting}[language=asm, mathescape, numbers=none]
+// initial:  reg1=$100$   reg2=        stack=$\angl{n, F_{n-1}}$
+\end{lstlisting}
+\begin{lstlisting}[language=asm, mathescape, firstnumber=100]
+read 0 reg2 // reg1=$100$   reg2=$F_{n-1}$   stack=$\angl{n, F_{n-1}}$
+pop 0       // reg1=$100$   reg2=$F_{n-1}$   stack=$\angl{n }$
+...
+\end{lstlisting}
+\begin{lstlisting}[language=asm, mathescape, numbers=none]
+// final:    ???
+\end{lstlisting}
+
+\newpage
+
+\textbf{Answer:}
+
+\end{enumerate}
+\end{document}
